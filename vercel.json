@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "server.ts": {
+      "includeFiles": "{public/**,menu-seed.csv,menu-image-map.json}"
+    }
+  }
+}
