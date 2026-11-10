@@ -57,3 +57,12 @@
 .menu-hero p{max-width:590px;color:#fff8f4;text-shadow:0 2px 12px rgba(0,0,0,.7)}
 .menu-hero .visual-disclosure{color:#f5dcd7}
 @media(max-width:650px){.menu-hero{min-height:330px;padding:55px 0;background-position:56% center}.menu-hero::before{background:linear-gradient(90deg,rgba(27,17,20,.9),rgba(36,19,22,.65)),linear-gradient(0deg,rgba(23,14,15,.35),transparent 55%)}.menu-hero h1{font-size:clamp(49px,11vw,64px)}.menu-hero p{max-width:360px}}
+
+/* Show the full storefront in the home hero while a softened copy fills its frame. */
+.hero-place{isolation:isolate;background:#a51932;overflow:hidden;padding:48px 5% 64px}
+.hero-place::before{content:'';position:absolute;inset:-24px;width:auto;height:auto;border:0;border-radius:0;background:url('/restaurant-front.png') center/cover no-repeat;filter:blur(16px) brightness(.6) saturate(1.15);transform:scale(1.08);opacity:.8}
+.hero-place::after{content:'';position:absolute;inset:0;width:auto;height:auto;border:0;border-radius:0;background:linear-gradient(135deg,rgba(124,8,30,.32),rgba(59,12,23,.55))}
+.hero-place-image{position:relative;z-index:1;display:block;width:100%;height:auto;max-width:680px;box-shadow:0 24px 55px rgba(31,6,13,.38);border:5px solid rgba(255,245,220,.8);border-radius:3px}
+.hero-place .art-caption{z-index:1;text-shadow:0 2px 12px rgba(0,0,0,.6)}
+@media(max-width:900px){.hero-place{min-height:340px;padding:35px 8% 55px}.hero-place-image{max-width:620px}}
+@media(max-width:650px){.hero-place{min-height:250px;padding:22px 6% 32px}.hero-place-image{border-width:3px}}
