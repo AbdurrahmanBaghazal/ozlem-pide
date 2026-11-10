@@ -6,7 +6,7 @@ import { join } from 'node:path';
 
 process.env.NODE_ENV = 'test';
 process.env.RAYKENT_DATA_DIR = mkdtempSync(join(tmpdir(), 'raykent-app-test-'));
-const { server } = await import('../server.mjs');
+const { server } = await import('../local-server.mjs');
 
 test('owner setup, draft publishing, and staff permissions', async () => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -65,3 +65,4 @@ test('owner setup, draft publishing, and staff permissions', async () => {
     assert.equal(redirect.headers.get('location'), '/menu');
   } finally { await new Promise(resolve => server.close(resolve)); }
 });
+
