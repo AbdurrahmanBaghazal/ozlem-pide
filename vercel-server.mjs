@@ -58,6 +58,9 @@ async function initialize() {
       CREATE TABLE IF NOT EXISTS uploaded_images (
         filename TEXT PRIMARY KEY, mime_type TEXT NOT NULL, image_data BYTEA NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS login_attempts (
+        attempt_key TEXT PRIMARY KEY, attempt_count INTEGER NOT NULL, blocked_until BIGINT NOT NULL
+      );
     `);
     for (const [key, value] of Object.entries(defaults)) {
       await client.query('INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT (key) DO NOTHING', [key, value]);
@@ -144,7 +147,6 @@ const staticFiles = new Map([
   ['/restaurant-front.png', ['public/restaurant-front.png', 'image/png']], ['/menu.js', ['public/menu.js', 'text/javascript; charset=utf-8']],
   ['/admin.js', ['public/admin.js', 'text/javascript; charset=utf-8']]
 ]);
-const loginAttempts = new Map();
 
 export const server = createServer(async (req, res) => {
   try {
@@ -198,15 +200,21 @@ export const server = createServer(async (req, res) => {
     }
     if (method === 'POST' && path === '/api/login') {
       const address = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim();
-      const attempt = loginAttempts.get(address) || { count: 0, until: 0 };
-      if (attempt.count >= 8 && attempt.until > Date.now()) return fail(res, 429, 'Çok fazla deneme. Daha sonra tekrar deneyin.');
       const input = await bodyJson(req);
+      const attemptKey = hashToken(`${address}:${String(input.username || '').toLowerCase()}`);
+      const attempt = await one('SELECT attempt_count,blocked_until FROM login_attempts WHERE attempt_key=$1', [attemptKey]);
+      if (attempt?.attempt_count >= 8 && Number(attempt.blocked_until) > Date.now()) return fail(res, 429, 'Çok fazla deneme. Daha sonra tekrar deneyin.');
       const user = await one('SELECT * FROM users WHERE lower(username)=lower($1) AND active=1', [String(input.username || '')]);
       if (!user || !verifyPassword(String(input.password || ''), user.password_hash)) {
-        loginAttempts.set(address, { count: attempt.count + 1, until: Date.now() + 15 * 60000 });
+        const now = Date.now();
+        await query(`INSERT INTO login_attempts(attempt_key,attempt_count,blocked_until) VALUES($1,1,$2)
+          ON CONFLICT(attempt_key) DO UPDATE SET
+          attempt_count=CASE WHEN login_attempts.blocked_until<$3 THEN 1 ELSE login_attempts.attempt_count+1 END,
+          blocked_until=$2`, [attemptKey, now + 15 * 60000, now]);
         return fail(res, 401, 'Kullanıcı adı veya şifre hatalı.');
       }
-      loginAttempts.delete(address); await setSession(res, user.id); await audit(user.id, 'login');
+      await query('DELETE FROM login_attempts WHERE attempt_key=$1', [attemptKey]);
+      await setSession(res, user.id); await audit(user.id, 'login');
       return json(res, 200, { ok: true });
     }
     if (method === 'POST' && path === '/api/logout') {
