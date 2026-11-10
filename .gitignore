@@ -1,0 +1,7 @@
+data/
+node_modules/
+uploads/
+.test-preview/
+menu-header-preview.png
+.vercel/
+.env*
