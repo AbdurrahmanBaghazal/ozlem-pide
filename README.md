@@ -12,6 +12,7 @@ Turkish restaurant website, digital menu, and owner dashboard built for Raykent 
 - First-run owner setup with no default password.
 - Owner dashboard to edit products and restaurant details, preview drafts, and publish menu changes.
 - Owner-created editor accounts. Editors can manage draft products; only the owner can publish, manage accounts, or change restaurant details.
+- One-time owner password recovery using the private Vercel setup key; a successful reset signs out existing owner sessions.
 - SQLite persistence, server-side sessions, login limiting, and an audit trail.
 - A stable `/q` menu redirect and downloadable SVG QR artwork after a public base URL is configured.
 
@@ -36,6 +37,8 @@ The repository includes `server.ts`, the Vercel entrypoint, and `vercel-server.m
 Connect a Neon PostgreSQL database through Vercel Storage and make its `DATABASE_URL` available to Production. Add a random secret as `ADMIN_SETUP_KEY` in the Vercel project's Production environment. The database schema and initial 64-item menu are created on the first API request. The first owner setup at `/admin` requires that key; the owner chooses their own username and password. Once created, no further owner setup is allowed. Keep the setup key private and remove it from the environment after owner setup if desired.
 
 The generated food images and restaurant photograph are committed as public assets. New images uploaded through the dashboard are stored in PostgreSQL, while `data/` stays local and untracked. Set the final HTTPS origin under **Restoran Bilgileri → Yayın adresi** before downloading the QR code.
+
+If the owner forgets their password, use **Şifremi unuttum** on `/admin`. Enter the owner username, the Production `ADMIN_SETUP_KEY`, and a new password of at least 12 characters. The key works for one reset only; rotate `ADMIN_SETUP_KEY` in Vercel and redeploy before another reset. The old password cannot be retrieved. Recovery is rate limited and invalidates the owner's existing sessions.
 
 ## Menu review
 

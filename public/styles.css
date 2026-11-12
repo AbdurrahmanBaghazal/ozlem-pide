@@ -79,3 +79,8 @@
 /* Studio attribution stays legible alongside the restaurant footer links. */
 .site-footer .studio-credit{display:inline-flex;align-items:center;gap:9px;color:#fff;letter-spacing:0;font-weight:600}
 .studio-credit img{display:block;width:30px;height:30px;object-fit:cover;border-radius:4px}
+
+.recovery-toggle{display:block;border:0;background:none;padding:0;color:var(--wine);font-size:12px;font-weight:700;text-align:left}
+#show-recovery{margin-top:16px}
+.recovery-toggle:hover{text-decoration:underline}
+.recovery-note{font-size:12px;line-height:1.6;color:var(--muted);margin:0 0 18px}

@@ -61,6 +61,9 @@ async function initialize() {
       CREATE TABLE IF NOT EXISTS login_attempts (
         attempt_key TEXT PRIMARY KEY, attempt_count INTEGER NOT NULL, blocked_until BIGINT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS used_recovery_keys (
+        key_hash TEXT PRIMARY KEY, used_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
     `);
     for (const [key, value] of Object.entries(defaults)) {
       await client.query('INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT (key) DO NOTHING', [key, value]);
@@ -215,6 +218,45 @@ export const server = createServer(async (req, res) => {
       }
       await query('DELETE FROM login_attempts WHERE attempt_key=$1', [attemptKey]);
       await setSession(res, user.id); await audit(user.id, 'login');
+      return json(res, 200, { ok: true });
+    }
+    if (method === 'POST' && path === '/api/recover-owner') {
+      const input = await bodyJson(req);
+      if (!validUsername(input.username) || !validPassword(input.password)) return fail(res, 400, 'Kullanıcı adı ve en az 12 karakterli yeni şifre girin.');
+      const recoveryKey = process.env.ADMIN_SETUP_KEY;
+      if (!recoveryKey) return fail(res, 503, 'Şifre kurtarma sunucuda yapılandırılmamış.');
+      const address = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim();
+      const attemptKey = hashToken(`owner-recovery:${address}`);
+      const attempt = await one('SELECT attempt_count,blocked_until FROM login_attempts WHERE attempt_key=$1', [attemptKey]);
+      if (attempt?.attempt_count >= 8 && Number(attempt.blocked_until) > Date.now()) return fail(res, 429, 'Çok fazla deneme. 15 dakika sonra tekrar deneyin.');
+      const providedKey = typeof input.recoveryKey === 'string' ? input.recoveryKey : '';
+      const providedHash = Buffer.from(hashToken(providedKey), 'hex');
+      const expectedHash = Buffer.from(hashToken(recoveryKey), 'hex');
+      const owner = await one('SELECT id FROM users WHERE lower(username)=lower($1) AND role=$2 AND active=1', [input.username, 'owner']);
+      if (!owner || !timingSafeEqual(providedHash, expectedHash)) {
+        const now = Date.now();
+        await query(`INSERT INTO login_attempts(attempt_key,attempt_count,blocked_until) VALUES($1,1,$2)
+          ON CONFLICT(attempt_key) DO UPDATE SET
+          attempt_count=CASE WHEN login_attempts.blocked_until<$3 THEN 1 ELSE login_attempts.attempt_count+1 END,
+          blocked_until=$2`, [attemptKey, now + 15 * 60000, now]);
+        return fail(res, 403, 'Kullanıcı adı veya kurtarma anahtarı yanlış.');
+      }
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('SELECT pg_advisory_xact_lock(31001995)');
+        const consumed = await client.query('INSERT INTO used_recovery_keys(key_hash) VALUES($1) ON CONFLICT DO NOTHING RETURNING key_hash', [hashToken(recoveryKey)]);
+        if (!consumed.rowCount) {
+          await client.query('ROLLBACK');
+          return fail(res, 409, 'Bu kurtarma anahtarı kullanıldı. Vercel’de yeni bir kurulum anahtarı oluşturun.');
+        }
+        await client.query('UPDATE users SET password_hash=$1 WHERE id=$2', [hashPassword(input.password), owner.id]);
+        await client.query('DELETE FROM sessions WHERE user_id=$1', [owner.id]);
+        await client.query('INSERT INTO audit(user_id,action) VALUES($1,$2)', [owner.id, 'owner_password_recovery']);
+        await client.query('COMMIT');
+      } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
+      await query('DELETE FROM login_attempts WHERE attempt_key=$1', [attemptKey]);
+      res.setHeader('Set-Cookie', 'raykent_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0; Secure');
       return json(res, 200, { ok: true });
     }
     if (method === 'POST' && path === '/api/logout') {

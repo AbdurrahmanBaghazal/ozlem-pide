@@ -6,6 +6,7 @@ import { join } from 'node:path';
 
 process.env.NODE_ENV = 'test';
 process.env.RAYKENT_DATA_DIR = mkdtempSync(join(tmpdir(), 'raykent-app-test-'));
+process.env.ADMIN_SETUP_KEY = 'test-only-owner-recovery-key-32-characters';
 const { server } = await import('../local-server.mjs');
 
 test('owner setup, draft publishing, and staff permissions', async () => {
@@ -63,6 +64,14 @@ test('owner setup, draft publishing, and staff permissions', async () => {
     const redirect = await fetch(base + '/q', { redirect: 'manual' });
     assert.equal(redirect.status, 302);
     assert.equal(redirect.headers.get('location'), '/menu');
+
+    assert.equal((await request('/api/recover-owner', 'POST', { username: 'owner', recoveryKey: 'wrong', password: 'NewStrongPassword123!' })).status, 403);
+    const recovered = await request('/api/recover-owner', 'POST', { username: 'owner', recoveryKey: process.env.ADMIN_SETUP_KEY, password: 'NewStrongPassword123!' });
+    assert.equal(recovered.status, 200);
+    assert.equal((await request('/api/admin/me', 'GET', undefined, ownerCookie)).status, 401);
+    assert.equal((await request('/api/recover-owner', 'POST', { username: 'owner', recoveryKey: process.env.ADMIN_SETUP_KEY, password: 'AnotherPassword123!' })).status, 409);
+    assert.equal((await request('/api/login', 'POST', { username: 'owner', password: 'StrongPassword123!' })).status, 401);
+    assert.equal((await request('/api/login', 'POST', { username: 'owner', password: 'NewStrongPassword123!' })).status, 200);
   } finally { await new Promise(resolve => server.close(resolve)); }
 });
 

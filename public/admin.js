@@ -29,6 +29,7 @@ async function boot() {
     $('#auth-subtitle').textContent = setupNeeded ? 'Restoranın ilk yönetici hesabını oluşturun.' : 'Menünüzü yönetmek için giriş yapın.';
     $('#display-name-field').hidden = !setupNeeded;
     $('#setup-key-field').hidden = !setupNeeded || !status.requiresSetupKey;
+    $('#show-recovery').hidden = setupNeeded;
     $('#auth-submit').textContent = setupNeeded ? 'Hesabı Oluştur' : 'Giriş Yap';
     $('#password').autocomplete = setupNeeded ? 'new-password' : 'current-password';
   }
@@ -150,6 +151,32 @@ $('#auth-form').addEventListener('submit', async event => {
     const result = await api('/api/admin/me'); user = result.user; showDashboard();
     await Promise.all([loadSummary(), loadProducts()]);
   } catch (error) { message('#auth-message', error.message, true); }
+});
+function showRecovery(open) {
+  $('#auth-form').hidden = open;
+  $('#show-recovery').hidden = open || setupNeeded;
+  $('#recovery-form').hidden = !open;
+  $('#auth-title').textContent = open ? 'Yönetici şifresini sıfırla' : 'Yönetim girişi';
+  $('#auth-subtitle').textContent = open ? 'Kurulum anahtarınızla yeni bir şifre belirleyin.' : 'Menünüzü yönetmek için giriş yapın.';
+  message('#auth-message', '');
+  message('#recovery-message', '');
+  if (open) $('#recovery-username').value = $('#username').value;
+}
+$('#show-recovery').addEventListener('click', () => showRecovery(true));
+$('#back-to-login').addEventListener('click', () => showRecovery(false));
+$('#recovery-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const password = $('#recovery-password').value;
+  if (password !== $('#recovery-confirm').value) return message('#recovery-message', 'Yeni şifreler eşleşmiyor.', true);
+  try {
+    const username = $('#recovery-username').value;
+    await send('/api/recover-owner', 'POST', { username, recoveryKey: $('#recovery-key').value, password });
+    $('#recovery-form').reset();
+    showRecovery(false);
+    $('#username').value = username;
+    $('#password').value = '';
+    message('#auth-message', 'Şifreniz yenilendi. Yeni şifrenizle giriş yapın. Kurulum anahtarını Vercel’de yenileyin.');
+  } catch (error) { message('#recovery-message', error.message, true); }
 });
 $('#logout-button').addEventListener('click', async () => { await send('/api/logout', 'POST', {}); location.reload(); });
 document.querySelectorAll('.side-link').forEach(button => button.addEventListener('click', () => switchSection(button.dataset.section)));

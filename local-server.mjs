@@ -57,6 +57,10 @@ db.exec(`
     details TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
+  CREATE TABLE IF NOT EXISTS used_recovery_keys (
+    key_hash TEXT PRIMARY KEY,
+    used_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 const defaults = {
@@ -255,6 +259,36 @@ export const server = createServer(async (req, res) => {
       loginAttempts.delete(address);
       setSession(res, user.id, req.socket.encrypted);
       audit(user.id, 'login');
+      return json(res, 200, { ok: true });
+    }
+    if (method === 'POST' && path === '/api/recover-owner') {
+      const input = await bodyJson(req);
+      if (!validUsername(input.username) || !validPassword(input.password)) return fail(res, 400, 'Kullanıcı adı ve en az 12 karakterli yeni şifre girin.');
+      const recoveryKey = process.env.ADMIN_SETUP_KEY;
+      if (!recoveryKey) return fail(res, 503, 'Şifre kurtarma sunucuda yapılandırılmamış.');
+      const address = req.socket.remoteAddress || 'unknown';
+      const attemptKey = `owner-recovery:${address}`;
+      const attempt = loginAttempts.get(attemptKey) || { count: 0, until: 0 };
+      if (attempt.count >= 8 && attempt.until > Date.now()) return fail(res, 429, 'Çok fazla deneme. 15 dakika sonra tekrar deneyin.');
+      const providedKey = typeof input.recoveryKey === 'string' ? input.recoveryKey : '';
+      const providedHash = Buffer.from(hashToken(providedKey), 'hex');
+      const expectedHash = Buffer.from(hashToken(recoveryKey), 'hex');
+      const owner = db.prepare("SELECT id FROM users WHERE username=? AND role='owner' AND active=1").get(input.username);
+      if (!owner || !timingSafeEqual(providedHash, expectedHash)) {
+        loginAttempts.set(attemptKey, { count: attempt.until < Date.now() ? 1 : attempt.count + 1, until: Date.now() + 15 * 60000 });
+        return fail(res, 403, 'Kullanıcı adı veya kurtarma anahtarı yanlış.');
+      }
+      db.exec('BEGIN');
+      try {
+        const consumed = db.prepare('INSERT OR IGNORE INTO used_recovery_keys(key_hash) VALUES(?)').run(hashToken(recoveryKey));
+        if (!consumed.changes) { db.exec('ROLLBACK'); return fail(res, 409, 'Bu kurtarma anahtarı kullanıldı. Yeni bir kurulum anahtarı oluşturun.'); }
+        db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hashPassword(input.password), owner.id);
+        db.prepare('DELETE FROM sessions WHERE user_id=?').run(owner.id);
+        audit(owner.id, 'owner_password_recovery');
+        db.exec('COMMIT');
+      } catch (error) { db.exec('ROLLBACK'); throw error; }
+      loginAttempts.delete(attemptKey);
+      res.setHeader('Set-Cookie', 'raykent_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');
       return json(res, 200, { ok: true });
     }
     if (method === 'POST' && path === '/api/logout') {
