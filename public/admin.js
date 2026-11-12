@@ -166,10 +166,12 @@ $('#show-recovery').addEventListener('click', () => showRecovery(true));
 $('#back-to-login').addEventListener('click', () => showRecovery(false));
 $('#recovery-form').addEventListener('submit', async event => {
   event.preventDefault();
+  const username = $('#recovery-username').value.trim();
   const password = $('#recovery-password').value;
+  if (!/^[A-Za-z0-9_.-]{3,32}$/.test(username)) return message('#recovery-message', 'Yönetici kullanıcı adını girin; ad soyad veya e-posta adresi kullanmayın.', true);
+  if (password.length < 12 || password.length > 128) return message('#recovery-message', 'Yeni şifre 12–128 karakter olmalı.', true);
   if (password !== $('#recovery-confirm').value) return message('#recovery-message', 'Yeni şifreler eşleşmiyor.', true);
   try {
-    const username = $('#recovery-username').value;
     await send('/api/recover-owner', 'POST', { username, recoveryKey: $('#recovery-key').value, password });
     $('#recovery-form').reset();
     showRecovery(false);

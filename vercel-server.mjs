@@ -222,7 +222,8 @@ export const server = createServer(async (req, res) => {
     }
     if (method === 'POST' && path === '/api/recover-owner') {
       const input = await bodyJson(req);
-      if (!validUsername(input.username) || !validPassword(input.password)) return fail(res, 400, 'Kullanıcı adı ve en az 12 karakterli yeni şifre girin.');
+      if (!validUsername(input.username)) return fail(res, 400, 'Yönetici kullanıcı adı 3–32 karakter olmalı; yalnızca harf, rakam, nokta, tire ve alt çizgi kullanın.');
+      if (!validPassword(input.password)) return fail(res, 400, 'Yeni şifre 12–128 karakter olmalı.');
       const recoveryKey = process.env.ADMIN_SETUP_KEY;
       if (!recoveryKey) return fail(res, 503, 'Şifre kurtarma sunucuda yapılandırılmamış.');
       const address = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim();
@@ -252,6 +253,7 @@ export const server = createServer(async (req, res) => {
         }
         await client.query('UPDATE users SET password_hash=$1 WHERE id=$2', [hashPassword(input.password), owner.id]);
         await client.query('DELETE FROM sessions WHERE user_id=$1', [owner.id]);
+        await client.query('DELETE FROM login_attempts WHERE attempt_key=$1', [hashToken(`${address}:${input.username.toLowerCase()}`)]);
         await client.query('INSERT INTO audit(user_id,action) VALUES($1,$2)', [owner.id, 'owner_password_recovery']);
         await client.query('COMMIT');
       } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }

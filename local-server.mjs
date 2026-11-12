@@ -263,7 +263,8 @@ export const server = createServer(async (req, res) => {
     }
     if (method === 'POST' && path === '/api/recover-owner') {
       const input = await bodyJson(req);
-      if (!validUsername(input.username) || !validPassword(input.password)) return fail(res, 400, 'Kullanıcı adı ve en az 12 karakterli yeni şifre girin.');
+      if (!validUsername(input.username)) return fail(res, 400, 'Yönetici kullanıcı adı 3–32 karakter olmalı; yalnızca harf, rakam, nokta, tire ve alt çizgi kullanın.');
+      if (!validPassword(input.password)) return fail(res, 400, 'Yeni şifre 12–128 karakter olmalı.');
       const recoveryKey = process.env.ADMIN_SETUP_KEY;
       if (!recoveryKey) return fail(res, 503, 'Şifre kurtarma sunucuda yapılandırılmamış.');
       const address = req.socket.remoteAddress || 'unknown';
@@ -288,6 +289,7 @@ export const server = createServer(async (req, res) => {
         db.exec('COMMIT');
       } catch (error) { db.exec('ROLLBACK'); throw error; }
       loginAttempts.delete(attemptKey);
+      loginAttempts.delete(address);
       res.setHeader('Set-Cookie', 'raykent_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');
       return json(res, 200, { ok: true });
     }

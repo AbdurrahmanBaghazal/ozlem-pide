@@ -65,7 +65,15 @@ test('owner setup, draft publishing, and staff permissions', async () => {
     assert.equal(redirect.status, 302);
     assert.equal(redirect.headers.get('location'), '/menu');
 
+    const invalidName = await request('/api/recover-owner', 'POST', { username: 'Owner Name', recoveryKey: process.env.ADMIN_SETUP_KEY, password: 'NewStrongPassword123!' });
+    assert.equal(invalidName.status, 400);
+    assert.match(invalidName.data.error, /kullanıcı adı/);
+    const shortPassword = await request('/api/recover-owner', 'POST', { username: 'owner', recoveryKey: process.env.ADMIN_SETUP_KEY, password: 'too-short' });
+    assert.equal(shortPassword.status, 400);
+    assert.match(shortPassword.data.error, /Yeni şifre/);
     assert.equal((await request('/api/recover-owner', 'POST', { username: 'owner', recoveryKey: 'wrong', password: 'NewStrongPassword123!' })).status, 403);
+    for (let i = 0; i < 8; i++) assert.equal((await request('/api/login', 'POST', { username: 'owner', password: 'wrong-password' })).status, 401);
+    assert.equal((await request('/api/login', 'POST', { username: 'owner', password: 'StrongPassword123!' })).status, 429);
     const recovered = await request('/api/recover-owner', 'POST', { username: 'owner', recoveryKey: process.env.ADMIN_SETUP_KEY, password: 'NewStrongPassword123!' });
     assert.equal(recovered.status, 200);
     assert.equal((await request('/api/admin/me', 'GET', undefined, ownerCookie)).status, 401);

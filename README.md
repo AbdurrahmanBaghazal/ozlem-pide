@@ -38,7 +38,7 @@ Connect a Neon PostgreSQL database through Vercel Storage and make its `DATABASE
 
 The generated food images and restaurant photograph are committed as public assets. New images uploaded through the dashboard are stored in PostgreSQL, while `data/` stays local and untracked. Set the final HTTPS origin under **Restoran Bilgileri → Yayın adresi** before downloading the QR code.
 
-If the owner forgets their password, use **Şifremi unuttum** on `/admin`. Enter the owner username, the Production `ADMIN_SETUP_KEY`, and a new password of at least 12 characters. The key works for one reset only; rotate `ADMIN_SETUP_KEY` in Vercel and redeploy before another reset. The old password cannot be retrieved. Recovery is rate limited and invalidates the owner's existing sessions.
+If the owner forgets their password, use **Şifremi unuttum** on `/admin`. Enter the owner username (not the display name), the Production `ADMIN_SETUP_KEY`, and a new password of at least 12 characters. The key works for one reset only; rotate `ADMIN_SETUP_KEY` in Vercel and redeploy before another reset. The old password cannot be retrieved. Recovery is rate limited, clears that owner's login lockout, and invalidates existing sessions.
 
 ## Menu review
 
