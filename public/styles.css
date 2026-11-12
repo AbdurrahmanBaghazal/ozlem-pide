@@ -75,3 +75,7 @@
 .category-card h3{margin:20px 25px 8px}
 .category-card .card-action{margin:0 25px 23px}
 @media(max-width:650px){.card-photo{height:190px}.category-card h3{font-size:28px}}
+
+/* Studio attribution stays legible alongside the restaurant footer links. */
+.site-footer .studio-credit{display:inline-flex;align-items:center;gap:9px;color:#fff;letter-spacing:0;font-weight:600}
+.studio-credit img{display:block;width:30px;height:30px;object-fit:cover;border-radius:4px}
