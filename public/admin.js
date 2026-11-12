@@ -180,7 +180,9 @@ $('#recovery-form').addEventListener('submit', async event => {
     message('#auth-message', 'Şifreniz yenilendi. Yeni şifrenizle giriş yapın. Kurulum anahtarını Vercel’de yenileyin.');
   } catch (error) { message('#recovery-message', error.message, true); }
 });
-$('#logout-button').addEventListener('click', async () => { await send('/api/logout', 'POST', {}); location.reload(); });
+async function logout() { await send('/api/logout', 'POST', {}); location.reload(); }
+$('#logout-button').addEventListener('click', logout);
+$('#mobile-logout-button').addEventListener('click', logout);
 document.querySelectorAll('.side-link').forEach(button => button.addEventListener('click', () => switchSection(button.dataset.section)));
 $('#admin-search').addEventListener('input', renderProducts);
 $('#admin-category').addEventListener('change', renderProducts);
